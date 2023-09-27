@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Embed Page</title>
+    <!-- Include Tailwind CSS (CDN) -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.7/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="container mx-auto max-w-md">
+        <h1 class="text-3xl font-bold mb-4">YouTube URL Embedder</h1>
+
+        <form id="youtube-form" class="mb-8">
+            <!-- Input field for YouTube URL -->
+            <div class="mb-4">
+                <label for="youtube_url" class="block text-gray-700">Paste YouTube URL:</label>
+                <input type="text" id="youtube_url" name="youtube_url" placeholder="https://youtu.be/Hd_ptbiPoXM"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-blue-500">
+            </div>
+
+            <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:bg-blue-600">
+                Embed
+            </button>
+        </form>
+
+        <!-- Embedded YouTube video -->
+        <div id="videoContainer" class="mb-6">
+            <iframe id="embeddedVideo" width="560" height="315" src="" frameborder="0" allowfullscreen></iframe>
+        </div>
+
+        <!-- Text field next to the embedded video -->
+        <div class="mb-4">
+            <label for="video_description" class="block text-gray-700">Video Description:</label>
+            <input type="text" id="video_description" name="video_description" readonly
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none bg-gray-100">
+        </div>
+
+        <script>
+            document.getElementById('youtube-form').addEventListener('submit', function (e) {
+                e.preventDefault();  // Prevent the default form submission
+                const youtubeUrl = document.getElementById('youtube_url').value;
+
+                // Send a POST request to the Flask endpoint
+                fetch('/process_youtube_url', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `youtube_url=${encodeURIComponent(youtubeUrl)}`,
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update the embedded video and video description
+                        document.getElementById('embeddedVideo').src = data.embedded_video;
+                        document.getElementById('video_description').value = data.video_description;
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+            });
+        </script>
+    </div>
+</body>
+</html>
