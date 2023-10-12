@@ -1,7 +1,7 @@
 from flask import Flask, request, render_template, jsonify
 import openai  # Import the OpenAI library
 from scrape import YouTubeTranscriptScraper
-
+from config import API_KEY
 app = Flask(__name__)
 
 # Create an instance of the YouTubeTranscriptScraper
@@ -26,8 +26,7 @@ def process_youtube_url():
     # Update the HTML template with the transcript summary
     return jsonify({'transcript_summary': summarized})
 def summarize(text_chunks):
-    openai.api_key = "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"
-
+    openai.api_key = API_KEY
     # Initialize a variable to store the aggregated summaries
     summaries = {}
     # Process each text chunk sequentially
