@@ -25,38 +25,27 @@ def process_youtube_url():
     
     # Update the HTML template with the transcript summary
     return jsonify({'transcript_summary': summarized})
-
 def summarize(text_chunks):
-    openai.api_key = "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"
+    openai.api_key = "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"
 
-    # Initialize a variable to store the aggregated summary
-    aggregated_summary = ""
-
-    # Process each text chunk sequentially, starting from the 1st index (index 0 in Python)
-    for i in range(1, len(text_chunks)):
-        chunk = text_chunks[i]  # Get the text chunk at the current index
-
+    # Initialize a variable to store the aggregated summaries
+    summaries = {}
+    # Process each text chunk sequentially
+    for counter, chunk in enumerate(text_chunks, start=1):
         # Create the prompt for the current chunk
-        prompt = f"Summarize and provide key insights about the following:\n{chunk}"
+        prompt = f"Summarize and provide key insights about the following:\n'{chunk}'"
 
-        # Send the prompt to ChatGPT
         response = openai.Completion.create(
             engine="text-davinci-003",
             prompt=prompt,
             max_tokens=200  # Adjust max_tokens based on your desired response length
         )
-
         # Extract the summarized text from the response
         summary = response.choices[0].text.strip()
 
-        # Append the current summary to the accumulated summaries
-        aggregated_summary += f"{summary}\n"
-
-    # Print the aggregated summary
-    print("Aggregated Summary:")
-    print(aggregated_summary)
-
-    return aggregated_summary  # Return the aggregated summary
+        summaries[f"Summary {counter}"] = summary
+        
+    return summaries 
 
 def chunk_text(text, max_chunk_length):
     text_chunks = []

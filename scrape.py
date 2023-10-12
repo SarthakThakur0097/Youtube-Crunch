@@ -71,7 +71,7 @@ class YouTubeTranscriptScraper:
 
         # Get the transcript with timestamps
         transcript = self.transcript_without_timestamps(new_transcript_segments)
-        print(transcript)
+        #print(transcript)
         return transcript
 
     def transcript_with_timestamps(self, new_transcript_segments):

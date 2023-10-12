@@ -69,8 +69,10 @@
                 })
                     .then((response) => response.json())
                     .then((data) => {
+                        // Extract the summaries from the response data
+                        const summaries = data.transcript_summary;
                         // Update the transcript summary and hide the loading spinner when processing is complete
-                        document.getElementById("transcript_summary").value = data.transcript_summary;
+                        document.getElementById("transcript_summary").value = formatSummaries(summaries);
                         document.getElementById("loadingSpinner").classList.add("hidden");
                     })
                     .catch((error) => {
@@ -79,6 +81,16 @@
                         document.getElementById("loadingSpinner").classList.add("hidden");
                     });
             });
+        
+            // Function to format the summaries into a string
+            function formatSummaries(summaries) {
+                let formattedSummary = "";
+                for (const key in summaries) {
+                    formattedSummary += `${summaries[key]}\n\n`;
+                }
+                return formattedSummary;
+            }
+        
             // Function to extract the video ID from a YouTube URL
             function extractVideoId(url) {
                 const videoIdRegex = /(?:\/|v=)([a-zA-Z0-9_-]{11})(?:\?|&|$)/;
