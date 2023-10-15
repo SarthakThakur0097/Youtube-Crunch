@@ -2,6 +2,7 @@ import os
 import time
 import sys
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 
 class YouTubeTranscriptScraper:
     def __init__(self):
@@ -13,24 +14,32 @@ class YouTubeTranscriptScraper:
         self.driver.get(youtube_url)
 
         # Wait for the page to load (you may adjust the wait time as needed)
-        self.driver.implicitly_wait(20)
+        self.driver.implicitly_wait(5)
+        
+        try:
+            ad_preview_element = self.driver.find_element_by_class_name('ytp-ad-preview-slot')
+            # Click the element if it exists
+            ad_preview_element.click()
+        except NoSuchElementException:
+            # Handle the case where the element is not found
+            print("Ad preview element not found, proceeding to the next step.")
 
-        # Find the "Dismiss" button by its ID
-        dismiss_button = self.driver.find_element_by_id('dismiss-button')
-
-        # Click the "Dismiss" button
-        dismiss_button.click()
+        try:
+            dismiss_button = self.driver.find_element_by_id('dismiss-button')
+            # Click the "Dismiss" button
+            dismiss_button.click()
+        except NoSuchElementException:
+            # Handle the case where the "Dismiss" button is not found
+            print("Dismiss button not found, proceeding to the next step.")
 
         # Find the ellipsis button (three dots) by CSS selector
         ellipsis_button = self.driver.find_element_by_css_selector('button[aria-label="More actions"]')
 
-        time.sleep(2)
-
         # Use JavaScript to click the ellipsis button
         self.driver.execute_script("arguments[0].click();", ellipsis_button)
 
-        # Wait for a moment to ensure the menu options appear (you can adjust the wait time)
         time.sleep(2)
+        # Wait for a moment to ensure the menu options appear (you can adjust the wait time)
 
         # Find and click the "Show transcript" button by XPath
         transcript_button = self.driver.find_element_by_xpath("//yt-formatted-string[text()='Show transcript']")
@@ -42,9 +51,9 @@ class YouTubeTranscriptScraper:
         transcript_button_2 = self.driver.find_element_by_css_selector('button[aria-label="Show transcript"][title=""]')
         transcript_button_2.click()
 
-        # Wait for a moment (you can adjust the wait time)
         time.sleep(2)
-
+        
+        # Wait for a moment (you can adjust the wait time
         # Find the container element for the transcript section
         transcript_section_container = self.driver.find_element_by_css_selector('ytd-transcript-segment-list-renderer')
 
@@ -64,7 +73,7 @@ class YouTubeTranscriptScraper:
         self.driver.execute_script("arguments[0].scrollIntoView();", transcript_segments[-1])
 
         # Add a delay to allow time for the additional segments to load
-        time.sleep(2)  # You can adjust the sleep duration as needed
+          # You can adjust the sleep duration as needed
 
         # Extract the newly loaded transcript segments
         new_transcript_segments = transcript_section_container.find_elements_by_css_selector('ytd-transcript-segment-renderer')
