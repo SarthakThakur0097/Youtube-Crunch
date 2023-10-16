@@ -6,6 +6,13 @@ app = Flask(__name__)
 
 # Create an instance of the YouTubeTranscriptScraper
 scraper = YouTubeTranscriptScraper()
+@app.route('/signin')
+def signin():
+    return render_template('signin.html')
+
+@app.route('/register')
+def register():
+    return render_template('register.html')
 
 # Define an endpoint to serve the HTML page
 @app.route('/')
