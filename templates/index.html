@@ -2,11 +2,11 @@
 
 {% block content %}
     <!-- Content specific to the index page goes here -->
-    <form id="youtube-form" class="mb-8">
+    <form id="youtube-form" class="mb-8" action="/process_youtube_url" method="post">
         <!-- Input field for YouTube URL and Summarize button as a group -->
         <div class="mb-4 flex">
             <input type="text" id="youtube_url" name="youtube_url" placeholder="Youtube URL" class="flex-1 p-2 border border-gray-300 rounded-l-md h-10">
-            <button type="button" id="summarize-button" class="bg-blue-500 text-white px-4 py-2 rounded-r-md h-10 self-start">Summarize</button>
+            <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-r-md h-10 self-start">Summarize</button>
         </div>
     </form>
     <!-- Embedded YouTube video -->
@@ -20,54 +20,35 @@
     </div>
     <script>
         // Function to handle form submission
-        function handleFormSubmission() {
-            const youtubeUrl = document.getElementById("youtube_url").value;
-            // Show the loading spinner
-            document.getElementById("loadingSpinner").classList.remove("hidden");
-            // Extract the video ID from the YouTube URL
-            const videoId = extractVideoId(youtubeUrl);
-            // Update the YouTube video URL with the extracted video ID
-            document.getElementById("embeddedVideo").src = `https://www.youtube.com/embed/${videoId}`;
-            // Send a POST request to the Flask endpoint
-            fetch("/process_youtube_url", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: `youtube_url=${encodeURIComponent(youtubeUrl)}`,
-            })
-            .then((response) => response.json())
-            .then((data) => {
-                // Extract the summaries from the response data
-                const summaries = data.transcript_summary;
-                // Update the transcript summary and hide the loading spinner when processing is complete
-                document.getElementById("transcript_summary").value = formatSummaries(summaries);
-                document.getElementById("loadingSpinner").classList.add("hidden");
-            })
-            .catch((error) => {
-                console.error("Error:", error);
-                // Handle errors and hide loading spinner here if needed
-                document.getElementById("loadingSpinner").classList.add("hidden");
-            });
-        }
+        // Function to handle form submission
+function handleFormSubmission(event) {
+    event.preventDefault(); // Prevent the default form submission behavior
 
-        // Function to format the summaries into a string
-        function formatSummaries(summaries) {
-            let formattedSummary = "";
-            for (const key in summaries) {
-                formattedSummary += `${summaries[key]}\n\n`;
-            }
-            return formattedSummary;
-        }
+    const youtubeUrl = document.getElementById("youtube_url").value;
 
-        // Function to extract the video ID from a YouTube URL
-        function extractVideoId(url) {
-            const videoIdRegex = /(?:\/|v=)([a-zA-Z0-9_-]{11})(?:\?|&|$)/;
-            const match = url.match(videoIdRegex);
-            return match ? match[1] : null;
-        }
+    // Send a POST request to the Flask endpoint
+    fetch("/process_youtube_url", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `youtube_url=${encodeURIComponent(youtubeUrl)}`,
+    })
+    .then((response) => response.json())
+    .then((data) => {
+        // Extract the summaries from the response data
+        const summaries = data.transcript_summary;
 
-        // Attach the form submission to the button's click event
-        document.getElementById("summarize-button").addEventListener("click", handleFormSubmission);
+        // Update the transcript summary and hide the loading spinner when processing is complete
+        document.getElementById("transcript_summary").value = formatSummaries(summaries);
+        document.getElementById("loadingSpinner").classList.add("hidden");
+    })
+    .catch((error) => {
+        console.error("Error:", error);
+        // Handle errors and hide loading spinner here if needed
+        document.getElementById("loadingSpinner").classList.add("hidden");
+    });
+}
+
     </script>
 {% endblock %}
