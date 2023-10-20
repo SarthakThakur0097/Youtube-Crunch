@@ -1,10 +1,5 @@
-from flask import Flask
-from views import views  # Import the views blueprint
+from website import create_app
 
-app = Flask(__name__)
-
-# Register the views blueprint
-app.register_blueprint(views)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
+    app = create_app()
     app.run(debug=True)

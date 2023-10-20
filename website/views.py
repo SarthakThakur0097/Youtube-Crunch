@@ -12,8 +12,14 @@ scraper = YouTubeTranscriptScraper()
 def signin():
     return render_template('signin.html')
 
-@views.route('/register')
+@views.route('/register', methods=['GET', 'POST'])
 def register():
+    print("In register")
+    email = request.form.get("email")
+    password = request.form.get("password")
+    phonenumber = request.form.get("phone")
+
+    print(email)
     return render_template('register.html')
 
 @views.route('/')
