@@ -3,6 +3,8 @@ from . import db
 from .models import User
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+# Rest of your auth.py code remains the same.
+
 
 auth = Blueprint("auth", __name__)
 
@@ -18,18 +20,20 @@ def login():
             if check_password_hash(user.password, password):
                 flash("Logged in!", category='success')
                 login_user(user, remember=True)
-                return redirect(url_for('views.home'))
+                return redirect(url_for('views.index'))
             else:
                 flash('Password is incorrect.', category='error')
         else:
             flash('Email does not exist.', category='error')
 
-    return render_template("login.html")
+    return render_template("index.html")
 
 
 @auth.route("/sign-up", methods=['GET', 'POST'])
 def sign_up():
+        # Test if db is accessible
     if request.method == 'POST':
+        print("inside post method")
         email = request.form.get("email")
         username = request.form.get("username")
         password1 = request.form.get("password1")
@@ -37,32 +41,47 @@ def sign_up():
 
         email_exists = User.query.filter_by(email=email).first()
         username_exists = User.query.filter_by(username=username).first()
-
+        print("before flash")
         if email_exists:
             flash('Email is already in use.', category='error')
+            print("flash 1")
         elif username_exists:
             flash('Username is already in use.', category='error')
+            print("flash 2")
         elif password1 != password2:
             flash('Password don\'t match!', category='error')
+            print("flash 3")
         elif len(username) < 2:
             flash('Username is too short.', category='error')
+            print("flash 4")
         elif len(password1) < 6:
             flash('Password is too short.', category='error')
+            print("flash 5")
         elif len(email) < 4:
             flash("Email is invalid.", category='error')
+            print("flash 6")
         else:
+            print("flash 7")
+            print("New user")
             new_user = User(email=email, username=username, password=generate_password_hash(
                 password1, method='sha256'))
             db.session.add(new_user)
-            db.session.commit()
+            try:
+                db.session.commit()
+                print("User added to the database")
+            except Exception as e:
+                db.session.rollback()
+                print("Error adding user to the database:", str(e))
+        
             login_user(new_user, remember=True)
             flash('User created!')
-            return redirect(url_for('views.home'))
-
+            return redirect(url_for('views.index'))
+        print("Registration logic executed")
     return render_template("signup.html")
-
 
 @auth.route("/logout")
 @login_required
 def logout():
     logout_user()
+    flash('Logged out successfully', category='success')
+    return redirect(url_for('views.index'))

@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify
 import openai  # Import the OpenAI library
 from scrape import YouTubeTranscriptScraper
 from config import API_KEY
+from .models import User
 
 views = Blueprint("views", __name__)
 
@@ -12,7 +13,7 @@ scraper = YouTubeTranscriptScraper()
 def signin():
     return render_template('signin.html')
 
-@views.route('/register', methods=['GET', 'POST'])
+""" @views.route('/register', methods=['GET', 'POST'])
 def register():
     print("In register")
     email = request.form.get("email")
@@ -20,7 +21,7 @@ def register():
     phonenumber = request.form.get("phone")
 
     print(email)
-    return render_template('register.html')
+    return render_template('register.html') """
 
 @views.route('/')
 def index():

@@ -2,16 +2,20 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from os import path
 from flask_login import LoginManager
+from flask_migrate import Migrate
 
 db = SQLAlchemy()
-DB_NAME = "database.db"
+
+migrate = Migrate()
 
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = "helloworld"
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_NAME}'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mssql+pyodbc://@DESKTOP-G805S36/YTCrunch?trusted_connection=yes&driver=ODBC Driver 17 for SQL Server'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
 
+    migrate.init_app(app, db)
     from .views import views
     from .auth import auth
 
@@ -24,17 +28,12 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(id):
+        from .models import User 
         return User.query.get(int(id))
-
-    with app.app_context():
-        create_database()
 
     return app
 
-def create_database():
-    if not path.exists(DB_NAME):
-        db.create_all()
-        print("Created database!")
+# The rest of your code remains the same
 
 if __name__ == "__main__":
     app = create_app()
