@@ -8,3 +8,7 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(150), unique=True)
     password = db.Column(db.String(150))
     date_created = db.Column(db.DateTime(timezone=True), default=func.now())
+    video_summary_count = db.Column(db.Integer, default=0)  # New field
+    is_premium = db.Column(db.Boolean, default=False)  # New field
+
+    # Add any additional methods or properties as needed

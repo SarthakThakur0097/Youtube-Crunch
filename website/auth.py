@@ -23,8 +23,11 @@ def login():
                 return redirect(url_for('views.index'))
             else:
                 flash('Password is incorrect.', category='error')
+                return render_template("signin.html")
         else:
             flash('Email does not exist.', category='error')
+            return render_template("signin.html")
+
 
     return render_template("index.html")
 
