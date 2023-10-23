@@ -26,16 +26,19 @@
             document.getElementById("loadingSpinner").classList.remove("hidden");
             // Extract the video ID from the YouTube URL
             const videoId = extractVideoId(youtubeUrl);
-            // Update the YouTube video URL with the extracted video ID
+            
+            // Set the src attribute of the embedded video with the video ID
             document.getElementById("embeddedVideo").src = `https://www.youtube.com/embed/${videoId}`;
-            // Send a POST request to the Flask endpoint
+            
+            // Send a POST request to the Flask endpoint with the video ID
             fetch("/process_youtube_url", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-                body: `youtube_url=${encodeURIComponent(youtubeUrl)}`,
+                body: `video_id=${videoId}`,
             })
+            
             .then((response) => response.json())
             .then((data) => {
                 // Extract the summaries from the response data
