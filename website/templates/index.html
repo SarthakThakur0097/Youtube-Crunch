@@ -37,7 +37,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('youtube-form');
-    const summariesLeftElement = document.getElementById('summaries-left'); // Selecting the element that shows summaries left
+    const summariesLeftElement = document.getElementById('summaries-left');
 
     form.onsubmit = function (e) {
         e.preventDefault();
@@ -59,36 +59,28 @@ document.addEventListener('DOMContentLoaded', function () {
             body: formData,
             credentials: 'same-origin',  // Include cookies
         })
-        .then(response => response.json())
-        .then(data => {
-            // Hide the loading spinner
-            document.getElementById('loadingSpinner').classList.add('hidden');
-
-            // Handle the messages
-            const flashMessagesContainer = document.getElementById('flash-messages-container');
-            flashMessagesContainer.innerHTML = '';  // Clear the current flash messages
-
-            if (data.messages) {
-                data.messages.forEach(function(msg) {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.classList.add('flash-message', msg.category); // Add styles based on message type
-                    messageDiv.textContent = msg.text;
-                    flashMessagesContainer.appendChild(messageDiv);
-                });
-            }
-
-            // If there's a summary, update the textarea and video embed
-            if (data.transcript_summary) {
-                document.getElementById('transcript_summary').value = data.transcript_summary;
-            }
-
-            // Update the "Summaries Left"
-            if (typeof data.new_summary_count === 'number') { // Check if it's the correct type
-                summariesLeftElement.textContent = "Summaries Left: " + data.new_summary_count;
+        .then(response => {
+            if(response.status === 401) { // Unauthorized
+                // Here, you redirect them to a login page or show a popup/modal asking them to log in.
+                alert('Please log in or register to use this feature.');
+                window.location.href = '{{ url_for('auth.login') }}'; // Redirect to login
+                return;  // It's important to stop processing if the user is unauthorized.
             } else {
-                console.error('Invalid or missing new_summary_count:', data.new_summary_count);
-                // You might want to display an error or a default message in the "Summaries Left" UI
+                return response.json();
             }
+        })
+        .then(data => {
+            // ... The rest of your code for handling the response ...
+
+            // Check if the user needs to log in (based on a custom response from the server, if available)
+            if (data && data.need_auth) {
+                // Prompt user to log in or sign up
+                alert('Please log in or register to continue.');
+                // You could also redirect to the login page here
+                window.location.href = '{{ url_for('auth.login') }}'; // Redirect to login
+            }
+
+            // Rest of your handling for successful response...
         })
         .catch((error) => {
             console.error('Error:', error);

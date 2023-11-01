@@ -7,7 +7,27 @@ from config import API_KEY
 from .models import User
 from youtube_transcript_api import YouTubeTranscriptApi
 
+from functools import wraps
+from flask import request, jsonify, redirect, url_for
+from flask_login import current_user
+
+def login_required_ajax(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                response = jsonify({
+                    'status': 'fail',
+                    'message': 'Authentication required.'
+                })
+                return response, 401
+            else:
+                return redirect(url_for('auth.login'))  # or wherever your login route is named
+        return f(*args, **kwargs)
+    return decorated_function
+
 views = Blueprint("views", __name__)
+MAX_SUMMARIES_PER_MONTH = 10
 
 @views.route('/signin')
 def signin():
@@ -26,7 +46,6 @@ def index():
     
     return render_template('index.html', user_data=user_data)
 
-
 @views.route('/pricing')
 def pricing():
     return render_template('pricing.html')
@@ -37,13 +56,14 @@ def test_flash():
     flash('This is a test flash message.', category='success')
     return render_template('pricing.html') 
 
-
-from datetime import datetime
-
 @views.route('/process_youtube_url', methods=['POST'])
-@login_required
+@login_required_ajax
 def process_youtube_url():
-    response_data = {'messages': [], 'transcript_summary': '', 'summaries_left': None}
+    response_data = {'messages': [], 'transcript_summary': ''}
+    
+    # Check if the user is not a premium user, then handle summaries limit.
+    if not current_user.is_premium:
+        response_data['summaries_left'] = None  # Will be populated later if the user is not premium
 
     youtube_url = request.form.get('youtube_url')
 
@@ -52,20 +72,17 @@ def process_youtube_url():
         return jsonify(response_data), 400  # Bad request status
 
     video_id = extract_video_id(youtube_url)
-
     transcript = fetch_transcript(video_id)
 
     if not transcript:
         response_data['messages'].append({'text': 'Error fetching transcript.', 'category': 'error'})
         return jsonify(response_data), 400
 
-    # Assuming this is a function you've defined to check the video length.
-    if is_video_too_long(transcript):  
+    if is_video_too_long(transcript):
         response_data['messages'].append({'text': 'Sorry, videos longer than 30 minutes cannot be summarized for free users.', 'category': 'error'})
         return jsonify(response_data), 400
 
-    # Assuming you have a method to check if the user has reached their summary limit.
-    if has_reached_summary_limit():  
+    if has_reached_summary_limit():
         response_data['messages'].append({'text': 'You have reached your monthly limit of summaries.', 'category': 'error'})
         return jsonify(response_data), 400
 
@@ -73,12 +90,14 @@ def process_youtube_url():
     if summarized:
         response_data['transcript_summary'] = summarized
 
-        # Increment the user's summary count after a successful summary operation
-        current_user.video_summary_count += 1
-        db.session.commit()
+        # Handle summary count and calculate summaries left for non-premium users.
+        if not current_user.is_premium:
+            current_user.video_summary_count += 1
+            db.session.commit()
 
-        # Retrieve the updated summary count
-        response_data['summaries_left'] = current_user.video_summary_count
+            # Calculate the remaining summaries for non-premium users.
+            summaries_left = MAX_SUMMARIES_PER_MONTH - current_user.video_summary_count
+            response_data['summaries_left'] = max(summaries_left, 0)  # To avoid negative numbers
     else:
         response_data['messages'].append({'text': 'Error summarizing the video.', 'category': 'error'})
         return jsonify(response_data), 500  # Internal server error status
@@ -159,7 +178,7 @@ def summarize(text_chunks):
         # Extract the summarized text from the response
         summary = response.choices[0].text.strip()
         
-        final_summary = final_summary+"\n\n"+summary
+        final_summary = final_summary+summary+"\n\n"
     
     return final_summary
 
