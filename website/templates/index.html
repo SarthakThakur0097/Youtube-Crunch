@@ -1,76 +1,120 @@
 {% extends "layout.html" %}
 
 {% block content %}
-    <!-- Content specific to the index page goes here -->
-    <form id="youtube-form" class="mb-8">
-        <!-- Input field for YouTube URL and Summarize button as a group -->
-        <div class="mb-4 flex">
-            <input type="text" id="youtube_url" name="youtube_url" placeholder="Youtube URL" class="flex-1 p-2 border border-gray-300 rounded-l-md h-10">
-            <button type="button" id="summarize-button" class="bg-blue-500 text-white px-4 py-2 rounded-r-md h-10 self-start">Summarize</button>
-        </div>
-    </form>
-    <!-- Embedded YouTube video -->
-    <div id="videoContainer" class="mb-6">
-        <iframe id="embeddedVideo" width="100%" height="315" src="https://www.youtube.com/embed/yD2JaAnMMo0" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen=""></iframe>
+<div class="homepage-content">
+    <!-- Display user-specific information, like remaining summaries -->
+    {% if user_data %}
+    <div class="user-info">
+        <p id="summaries-left">Summaries Left: {{ user_data.video_summary_count }}</p>
+        <!-- You can customize the appearance and styling as needed -->
     </div>
-    <!-- Text field for the transcript summary -->
-    <div class="relative">
-        <textarea id="transcript_summary" name="transcript_summary" readonly rows="16" cols="120" class="resize-none custom-textarea"></textarea>
-        <div id="loadingSpinner" class="spinner absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin hidden"></div> <!-- Hide the spinner initially -->
+    {% endif %}
+    <!-- Rest of your homepage content goes here -->
+</div>
+<!-- Container for flash messages -->
+<div id="flash-messages-container"></div>
+
+<!-- Form for submitting YouTube URL -->
+<form id="youtube-form" class="mb-8" method="POST" action="#">
+    <div class="mb-4 flex">
+        <input type="text" id="youtube_url" name="youtube_url" placeholder="YouTube URL" class="flex-1 p-2 border border-gray-300 rounded-l-md h-10">
+        <button id="test" type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-r-md h-10 self-start">Summarize</button>
     </div>
-    <script>
-        // Function to handle form submission
-        function handleFormSubmission() {
-            const youtubeUrl = document.getElementById("youtube_url").value;
-            // Show the loading spinner
-            document.getElementById("loadingSpinner").classList.remove("hidden");
-            // Extract the video ID from the YouTube URL
+</form>
+
+<!-- Embedded YouTube video -->
+<div id="videoContainer" class="mb-6">
+    <iframe id="embeddedVideo" width="100%" height="315" src="https://www.youtube.com/embed/" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</div>
+
+<!-- Textarea for the transcript summary -->
+<div class="relative">
+    <textarea id="transcript_summary" name="transcript_summary" readonly rows="16" cols="120" class="resize-none custom-textarea"></textarea>
+    <div id="loadingSpinner" class="spinner absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-t-4 border-blue-500 border-solid rounded-full animate-spin hidden"></div>
+</div>
+
+<!-- Script handling the form submission and response -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('youtube-form');
+        const summariesLeftElement = document.getElementById('summaries-left');
+        const submitButton = document.getElementById('test');
+        
+        let summaryInProgress = false;
+    
+        form.onsubmit = function (e) {
+            e.preventDefault();
+    
+            if (summaryInProgress) {
+                alert('Summary currently in process. Please wait.');
+                return;
+            }
+    
+            const youtubeUrl = document.getElementById('youtube_url').value;
             const videoId = extractVideoId(youtubeUrl);
-            
-            // Set the src attribute of the embedded video with the video ID
-            document.getElementById("embeddedVideo").src = `https://www.youtube.com/embed/${videoId}`;
-            
-            // Send a POST request to the Flask endpoint with the video ID
-            fetch("/process_youtube_url", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: `video_id=${videoId}`,
+            document.getElementById('embeddedVideo').src = `https://www.youtube.com/embed/${videoId}`;
+    
+            document.getElementById('loadingSpinner').classList.remove('hidden');
+    
+            let formData = new FormData();
+            formData.append('youtube_url', youtubeUrl);
+    
+            // Disable the submit button immediately when clicked
+            submitButton.disabled = true;
+    
+            summaryInProgress = true;
+    
+            fetch('{{ url_for('views.process_youtube_url') }}', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
             })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loadingSpinner').classList.add('hidden');
+                
+                summaryInProgress = false;
             
-            .then((response) => response.json())
-            .then((data) => {
-                // Extract the summaries from the response data
-                const summaries = data.transcript_summary;
-                // Update the transcript summary and hide the loading spinner when processing is complete
-                document.getElementById("transcript_summary").value = formatSummaries(summaries);
-                document.getElementById("loadingSpinner").classList.add("hidden");
+                const flashMessagesContainer = document.getElementById('flash-messages-container');
+                flashMessagesContainer.innerHTML = '';
+            
+                if (data.messages) {
+                    data.messages.forEach(function(msg) {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.classList.add('flash-message', msg.category);
+                        messageDiv.textContent = msg.text;
+                        flashMessagesContainer.appendChild(messageDiv);
+                    });
+                }
+            
+                if (data.transcript_summary) {
+                    document.getElementById('transcript_summary').value = data.transcript_summary;
+                }
+            
+                if (data.summaries_left !== null) {
+                    // Update the user_data.video_summary_count value here
+                    user_data.video_summary_count = data.summaries_left;
+                    summariesLeftElement.textContent = "Summaries Left: " + data.summaries_left;
+                } else {
+                    console.error('Invalid or missing summaries_left:', data.summaries_left);
+                }
             })
             .catch((error) => {
-                console.error("Error:", error);
-                // Handle errors and hide loading spinner here if needed
-                document.getElementById("loadingSpinner").classList.add("hidden");
+                console.error('Error:', error);
+    
+                summaryInProgress = false;
+            })
+            .finally(() => {
+                // Enable the submit button after the summary request is complete or in case of an error
+                submitButton.disabled = false;
             });
-        }
-
-        // Function to format the summaries into a string
-        function formatSummaries(summaries) {
-            let formattedSummary = "";
-            for (const key in summaries) {
-                formattedSummary += `${summaries[key]}\n\n`;
-            }
-            return formattedSummary;
-        }
-
-        // Function to extract the video ID from a YouTube URL
+        };
+    
         function extractVideoId(url) {
             const videoIdRegex = /(?:\/|v=)([a-zA-Z0-9_-]{11})(?:\?|&|$)/;
             const match = url.match(videoIdRegex);
             return match ? match[1] : null;
         }
-
-        // Attach the form submission to the button's click event
-        document.getElementById("summarize-button").addEventListener("click", handleFormSubmission);
+    });
     </script>
 {% endblock %}
