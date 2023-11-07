@@ -18,7 +18,7 @@
 <form id="youtube-form" class="mb-8" method="POST" action="#">
     <div class="mb-4 flex">
         <input type="text" id="youtube_url" name="youtube_url" placeholder="YouTube URL" class="flex-1 p-2 border border-gray-300 rounded-l-md h-10">
-        <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-r-md h-10 self-start">Summarize</button>
+        <button id="test" type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-r-md h-10 self-start">Summarize</button>
     </div>
 </form>
 
@@ -35,63 +35,86 @@
 
 <!-- Script handling the form submission and response -->
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('youtube-form');
-    const summariesLeftElement = document.getElementById('summaries-left');
-
-    form.onsubmit = function (e) {
-        e.preventDefault();
-
-        const youtubeUrl = document.getElementById('youtube_url').value;
-        const videoId = extractVideoId(youtubeUrl);
-        document.getElementById('embeddedVideo').src = `https://www.youtube.com/embed/${videoId}`;
-
-        // Show the loading spinner
-        document.getElementById('loadingSpinner').classList.remove('hidden');
-
-        // Construct the FormData object
-        let formData = new FormData();
-        formData.append('youtube_url', youtubeUrl);
-
-        // Perform the AJAX request
-        fetch('{{ url_for('views.process_youtube_url') }}', {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin',  // Include cookies
-        })
-        .then(response => {
-            if(response.status === 401) { // Unauthorized
-                // Here, you redirect them to a login page or show a popup/modal asking them to log in.
-                alert('Please log in or register to use this feature.');
-                window.location.href = '{{ url_for('auth.login') }}'; // Redirect to login
-                return;  // It's important to stop processing if the user is unauthorized.
-            } else {
-                return response.json();
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('youtube-form');
+        const summariesLeftElement = document.getElementById('summaries-left');
+        const submitButton = document.getElementById('test');
+        
+        let summaryInProgress = false;
+    
+        form.onsubmit = function (e) {
+            e.preventDefault();
+    
+            if (summaryInProgress) {
+                alert('Summary currently in process. Please wait.');
+                return;
             }
-        })
-        .then(data => {
-            // ... The rest of your code for handling the response ...
-
-            // Check if the user needs to log in (based on a custom response from the server, if available)
-            if (data && data.need_auth) {
-                // Prompt user to log in or sign up
-                alert('Please log in or register to continue.');
-                // You could also redirect to the login page here
-                window.location.href = '{{ url_for('auth.login') }}'; // Redirect to login
-            }
-
-            // Rest of your handling for successful response...
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-        });
-    };
-
-    function extractVideoId(url) {
-        const videoIdRegex = /(?:\/|v=)([a-zA-Z0-9_-]{11})(?:\?|&|$)/;
-        const match = url.match(videoIdRegex);
-        return match ? match[1] : null;
-    }
-});
-</script>
+    
+            const youtubeUrl = document.getElementById('youtube_url').value;
+            const videoId = extractVideoId(youtubeUrl);
+            document.getElementById('embeddedVideo').src = `https://www.youtube.com/embed/${videoId}`;
+    
+            document.getElementById('loadingSpinner').classList.remove('hidden');
+    
+            let formData = new FormData();
+            formData.append('youtube_url', youtubeUrl);
+    
+            // Disable the submit button immediately when clicked
+            submitButton.disabled = true;
+    
+            summaryInProgress = true;
+    
+            fetch('{{ url_for('views.process_youtube_url') }}', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loadingSpinner').classList.add('hidden');
+                
+                summaryInProgress = false;
+            
+                const flashMessagesContainer = document.getElementById('flash-messages-container');
+                flashMessagesContainer.innerHTML = '';
+            
+                if (data.messages) {
+                    data.messages.forEach(function(msg) {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.classList.add('flash-message', msg.category);
+                        messageDiv.textContent = msg.text;
+                        flashMessagesContainer.appendChild(messageDiv);
+                    });
+                }
+            
+                if (data.transcript_summary) {
+                    document.getElementById('transcript_summary').value = data.transcript_summary;
+                }
+            
+                if (data.summaries_left !== null) {
+                    // Update the user_data.video_summary_count value here
+                    user_data.video_summary_count = data.summaries_left;
+                    summariesLeftElement.textContent = "Summaries Left: " + data.summaries_left;
+                } else {
+                    console.error('Invalid or missing summaries_left:', data.summaries_left);
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+    
+                summaryInProgress = false;
+            })
+            .finally(() => {
+                // Enable the submit button after the summary request is complete or in case of an error
+                submitButton.disabled = false;
+            });
+        };
+    
+        function extractVideoId(url) {
+            const videoIdRegex = /(?:\/|v=)([a-zA-Z0-9_-]{11})(?:\?|&|$)/;
+            const match = url.match(videoIdRegex);
+            return match ? match[1] : null;
+        }
+    });
+    </script>
 {% endblock %}

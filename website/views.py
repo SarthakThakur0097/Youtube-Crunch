@@ -6,6 +6,7 @@ import openai  # Import the OpenAI library
 from config import API_KEY
 from .models import User
 from youtube_transcript_api import YouTubeTranscriptApi
+from urllib.parse import urlparse, parse_qs
 
 from functools import wraps
 from flask import request, jsonify, redirect, url_for
@@ -57,32 +58,32 @@ def test_flash():
     return render_template('pricing.html') 
 
 @views.route('/process_youtube_url', methods=['POST'])
-@login_required_ajax
+
+@login_required
 def process_youtube_url():
-    response_data = {'messages': [], 'transcript_summary': ''}
-    
-    # Check if the user is not a premium user, then handle summaries limit.
-    if not current_user.is_premium:
-        response_data['summaries_left'] = None  # Will be populated later if the user is not premium
+    response_data = {'messages': [], 'transcript_summary': '', 'summaries_left': None}
 
     youtube_url = request.form.get('youtube_url')
 
-    if not validate_youtube_url(youtube_url):
-        response_data['messages'].append({'text': 'Invalid YouTube URL. Please enter a valid YouTube video URL.', 'category': 'error'})
-        return jsonify(response_data), 400  # Bad request status
+    #if is_valid_youtube_url(youtube_url):
+    #    response_data['messages'].append({'text': 'Invalid YouTube URL. Please enter a valid YouTube video URL.', 'category': 'error'})
+     #   return jsonify(response_data), 400  # Bad request status
 
     video_id = extract_video_id(youtube_url)
+
     transcript = fetch_transcript(video_id)
 
     if not transcript:
         response_data['messages'].append({'text': 'Error fetching transcript.', 'category': 'error'})
         return jsonify(response_data), 400
 
-    if is_video_too_long(transcript):
+    # Assuming this is a function you've defined to check the video length.
+    if is_video_too_long(transcript):  
         response_data['messages'].append({'text': 'Sorry, videos longer than 30 minutes cannot be summarized for free users.', 'category': 'error'})
         return jsonify(response_data), 400
 
-    if has_reached_summary_limit():
+    # Assuming you have a method to check if the user has reached their summary limit.
+    if has_reached_summary_limit():  
         response_data['messages'].append({'text': 'You have reached your monthly limit of summaries.', 'category': 'error'})
         return jsonify(response_data), 400
 
@@ -90,14 +91,12 @@ def process_youtube_url():
     if summarized:
         response_data['transcript_summary'] = summarized
 
-        # Handle summary count and calculate summaries left for non-premium users.
-        if not current_user.is_premium:
-            current_user.video_summary_count += 1
-            db.session.commit()
+        # Increment the user's summary count after a successful summary operation
+        current_user.video_summary_count += 1
+        db.session.commit()
 
-            # Calculate the remaining summaries for non-premium users.
-            summaries_left = MAX_SUMMARIES_PER_MONTH - current_user.video_summary_count
-            response_data['summaries_left'] = max(summaries_left, 0)  # To avoid negative numbers
+        # Retrieve the updated summary count
+        response_data['summaries_left'] = current_user.video_summary_count
     else:
         response_data['messages'].append({'text': 'Error summarizing the video.', 'category': 'error'})
         return jsonify(response_data), 500  # Internal server error status
@@ -138,20 +137,28 @@ def summarize_transcript(transcript):
     chunk_texts = [chunk['text'] for chunk in transcript]
     return summarize(chunk_texts)
 
-def increment_summary_count():
-    if not current_user.is_premium:
-        current_user.video_summary_count += 1
-        db.session.commit()
-
 
 # Define the validate_youtube_url and extract_video_id functions
 # Define the validate_youtube_url and extract_video_id functions
 import re
 
-def validate_youtube_url(url):
-    # Regular expression for a YouTube URL
-    youtube_url_regex = r'^(https?\:\/\/)?(www\.youtube\.com|youtu\.?be)\/.+$'
-    return bool(re.match(youtube_url_regex, url, re.IGNORECASE))
+def is_valid_youtube_url(url):
+    # Parse the URL
+    parsed_url = urlparse(url)
+    
+    # Check if the hostname is 'www.youtube.com' or 'youtube.com'
+    if parsed_url.netloc == 'www.youtube.com' or parsed_url.netloc == 'youtube.com':
+        # Check if the path starts with '/watch'
+        if parsed_url.path.startswith('/watch'):
+            # Parse the query parameters
+            query_params = parse_qs(parsed_url.query)
+            
+            # Check if 'v' key is present in the query parameters
+            if 'v' in query_params:
+                return True
+    
+    return False
+
 
 def extract_video_id(url):
     video_id_regex = r'(?:\/|v=)([a-zA-Z0-9_-]{11})(?:\?|&|$)'
