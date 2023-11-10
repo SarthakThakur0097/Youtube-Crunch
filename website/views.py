@@ -66,18 +66,18 @@ def index():
     # Pass the base64 audio data to the template
     return render_template('index.html', user_data=user_data, audio_data=audio_base64)
 
-@""" views.route('/')
-def index():
-    user_data = None  # Initialize user_data to None
+#@""" views.route('/')
+#def index():
+#   user_data = None  # Initialize user_data to None
 
     # Check if the user is authenticated (logged in)
-    if current_user.is_authenticated:
+#    if current_user.is_authenticated:
         # Fetch user-specific data like video_summary_limit and video_summary_count
-        user_data = {
-            'video_summary_count': (5-current_user.video_summary_count)
-        }
+ #       user_data = {
+ #           'video_summary_count': (5-current_user.video_summary_count)
+#        }
     
-    return render_template('index.html', user_data=user_data) """
+ #   return render_template('index.html', user_data=user_data) """
 
 @views.route('/pricing')
 def pricing():
