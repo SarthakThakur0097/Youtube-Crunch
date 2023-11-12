@@ -26,7 +26,11 @@
         <div id="loadingSpinner" class="spinner absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-t-4 border-blue-500 rounded-full animate-spin hidden"></div>
     </div>
     
-    <audio id="audioPlayer" controls></audio>
+    <audio id="audioPlayer" controls>
+        <source src="data:audio/mp3;base64,{{ audio_data }}" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+    
 </div>
 
 <script>

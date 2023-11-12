@@ -22,7 +22,19 @@ aws_region_name = 'us-east-1'  # Change to your desired region
 # Initialize Amazon Polly client
 polly = boto3.client('polly', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key, region_name=aws_region_name)
 
+# Global variable to store the base64 encoded audio
+encoded_audio = None
 
+def encode_audio_file():
+    global encoded_audio
+    path_to_audio_file = 'audio/output.mp3'
+    try:
+        with open(path_to_audio_file, 'rb') as audio_file:
+            encoded_audio = base64.b64encode(audio_file.read()).decode('utf-8')
+    except IOError as e:
+        print(f'Error loading audio file: {e}')
+
+encode_audio_file()
 def login_required_ajax(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -45,39 +57,28 @@ MAX_SUMMARIES_PER_MONTH = 10
 def signin():
     return render_template('signin.html')
 
-@views.route('/')
+#@views.route('/')
+#def index():
+#    user_data = None
+#    if current_user.is_authenticated:
+#        user_data = {
+#            'video_summary_count': (5-current_user.video_summary_count)
+#        }
+
+#    return render_template('index.html', user_data=user_data, audio_data=encoded_audio)
+
+@ views.route('/')
 def index():
-    user_data = None
+    user_data = None  # Initialize user_data to None
+
+    # Check if the user is authenticated (logged in)
     if current_user.is_authenticated:
+    # Fetch user-specific data like video_summary_limit and video_summary_count
         user_data = {
             'video_summary_count': (5-current_user.video_summary_count)
         }
 
-    # Path to your hardcoded audio file within the audio directory
-    path_to_audio_file = os.path.join('audio', 'hardcoded_audio.mp3')
-    audio_base64 = ""
-    try:
-        # Read the audio file and encode it to base64
-        with open(path_to_audio_file, 'rb') as audio_file:
-            audio_base64 = base64.b64encode(audio_file.read()).decode('utf-8')
-    except IOError as e:
-        flash('Error loading audio file.', 'error')
-
-    # Pass the base64 audio data to the template
-    return render_template('index.html', user_data=user_data, audio_data=audio_base64)
-
-#@""" views.route('/')
-#def index():
-#   user_data = None  # Initialize user_data to None
-
-    # Check if the user is authenticated (logged in)
-#    if current_user.is_authenticated:
-        # Fetch user-specific data like video_summary_limit and video_summary_count
- #       user_data = {
- #           'video_summary_count': (5-current_user.video_summary_count)
-#        }
-    
- #   return render_template('index.html', user_data=user_data) """
+    return render_template('index.html', user_data=user_data)
 
 @views.route('/pricing')
 def pricing():
@@ -97,35 +98,27 @@ def synthesize_speech(text):
     return response['AudioStream'].read()
 
 # Modify the generate_audio function to accept a filename parameter
-def generate_audio(text, filename='output.mp3'):
+def generate_audio(text):
     try:
-        # Assume polly is a properly configured Polly client
+        # Convert text to speech using AWS Polly
         response = polly.synthesize_speech(
             Text=text,
             OutputFormat='mp3',
-            VoiceId='Joanna'
+            VoiceId='Joanna'  # You can choose different voices
         )
 
         # Check if the response has an audio stream
         if 'AudioStream' in response:
-            # Define the path where you want to save the audio file
-            audio_file_path = os.path.join('audio', filename)
-
-            # Write the audio stream to the file
-            with open(audio_file_path, 'wb') as file:
-                file.write(response['AudioStream'].read())
-            
-            print(f'Audio file {audio_file_path} written successfully.')
-
-            # Return the path to the saved audio file
-            return audio_file_path
+            # Encode the audio stream to base64
+            audio_base64 = base64.b64encode(response['AudioStream'].read()).decode('utf-8')
+            return audio_base64
         else:
-            print('No audio stream in response.')
-            return None  # Indicate failure
+            print('No audio stream in Polly response.')
+            return None
 
     except (BotoCoreError, ClientError) as e:
         print('Error generating audio:', str(e))
-        return None  # Indicate failure
+        return None
 
 
 @views.route('/process_youtube_url', methods=['POST'])
@@ -135,7 +128,7 @@ def process_youtube_url():
         'messages': [],
         'transcript_summary': '',
         'summaries_left': None,
-        'audio_base64': None  # Use base64 audio data string instead of URL
+        'audio_base64': None
     }
 
     youtube_url = request.form.get('youtube_url')
@@ -147,8 +140,7 @@ def process_youtube_url():
         return jsonify(response_data), 400
 
     if is_video_too_long(transcript):
-        response_data['messages'].append(
-            {'text': 'Sorry, videos longer than 30 minutes cannot be summarized for free users.', 'category': 'error'})
+        response_data['messages'].append({'text': 'Videos longer than 30 minutes cannot be summarized for free users.', 'category': 'error'})
         return jsonify(response_data), 400
 
     if has_reached_summary_limit():
@@ -157,32 +149,15 @@ def process_youtube_url():
 
     summarized = summarize_transcript(transcript)
 
-
     if summarized:
         response_data['transcript_summary'] = summarized
+        audio_base64 = generate_audio(summarized)
 
-        # Path to your hardcoded audio file within the audio directory
-        path_to_audio_file = os.path.join('audio', 'hardcoded_audio.mp3')
-
-        try:
-            # Read the audio file and encode it to base64
-            with open(path_to_audio_file, 'rb') as audio_file:
-                audio_base64 = base64.b64encode(audio_file.read()).decode('utf-8')
-
-            # Provide the audio data as base64 string to the client
+        if audio_base64:
             response_data['audio_base64'] = audio_base64
-
-            # Increment the user's summary count after a successful summary operation
             current_user.video_summary_count += 1
             db.session.commit()
-
-            # Retrieve the updated summary count
             response_data['summaries_left'] = current_user.video_summary_count
-
-        except IOError as e:
-            # If the file is not found or cannot be read, send an appropriate error message
-            response_data['messages'].append({'text': 'Error loading audio file.', 'category': 'error'})
-            return jsonify(response_data), 500
 
     return jsonify(response_data)
 
