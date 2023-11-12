@@ -7,11 +7,34 @@ from config import API_KEY
 from .models import User
 from youtube_transcript_api import YouTubeTranscriptApi
 from urllib.parse import urlparse, parse_qs
-
+import boto3
 from functools import wraps
 from flask import request, jsonify, redirect, url_for
 from flask_login import current_user
+import os  
+import base64
+from botocore.exceptions import BotoCoreError, ClientError
+# Configure your Amazon Polly settings
+aws_access_key_id = 'AKIAVO6ECS2UOP7HMT3F'
+aws_secret_access_key = 'xOCb3DePB0fzDrjcseOAbCuzvmZUMSRXnytwlgkT'
+aws_region_name = 'us-east-1'  # Change to your desired region
 
+# Initialize Amazon Polly client
+polly = boto3.client('polly', aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key, region_name=aws_region_name)
+
+# Global variable to store the base64 encoded audio
+encoded_audio = None
+
+def encode_audio_file():
+    global encoded_audio
+    path_to_audio_file = 'audio/output.mp3'
+    try:
+        with open(path_to_audio_file, 'rb') as audio_file:
+            encoded_audio = base64.b64encode(audio_file.read()).decode('utf-8')
+    except IOError as e:
+        print(f'Error loading audio file: {e}')
+
+encode_audio_file()
 def login_required_ajax(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -34,72 +57,107 @@ MAX_SUMMARIES_PER_MONTH = 10
 def signin():
     return render_template('signin.html')
 
-@views.route('/')
+#@views.route('/')
+#def index():
+#    user_data = None
+#    if current_user.is_authenticated:
+#        user_data = {
+#            'video_summary_count': (5-current_user.video_summary_count)
+#        }
+
+#    return render_template('index.html', user_data=user_data, audio_data=encoded_audio)
+
+@ views.route('/')
 def index():
     user_data = None  # Initialize user_data to None
 
     # Check if the user is authenticated (logged in)
     if current_user.is_authenticated:
-        # Fetch user-specific data like video_summary_limit and video_summary_count
+    # Fetch user-specific data like video_summary_limit and video_summary_count
         user_data = {
             'video_summary_count': (5-current_user.video_summary_count)
         }
-    
+
     return render_template('index.html', user_data=user_data)
 
 @views.route('/pricing')
 def pricing():
     return render_template('pricing.html')
+def synthesize_speech(text):
+    # Initialize the Polly client
+    polly_client = boto3.client('polly', region_name='us-east-1')  # Replace with your AWS region
 
-@views.route('/test_flash', methods=['POST'])
-def test_flash():
-    print("Inside test flash")
-    flash('This is a test flash message.', category='success')
-    return render_template('pricing.html') 
+    # Use Polly to synthesize text into speech
+    response = polly_client.synthesize_speech(
+        Text=text,
+        OutputFormat='mp3',  # You can choose other formats like 'ogg_vorbis', 'pcm', etc.
+        VoiceId='Joanna'  # You can choose different voices
+    )
+
+    # Save the speech output to a file or return it as a response
+    return response['AudioStream'].read()
+
+# Modify the generate_audio function to accept a filename parameter
+def generate_audio(text):
+    try:
+        # Convert text to speech using AWS Polly
+        response = polly.synthesize_speech(
+            Text=text,
+            OutputFormat='mp3',
+            VoiceId='Joanna'  # You can choose different voices
+        )
+
+        # Check if the response has an audio stream
+        if 'AudioStream' in response:
+            # Encode the audio stream to base64
+            audio_base64 = base64.b64encode(response['AudioStream'].read()).decode('utf-8')
+            return audio_base64
+        else:
+            print('No audio stream in Polly response.')
+            return None
+
+    except (BotoCoreError, ClientError) as e:
+        print('Error generating audio:', str(e))
+        return None
+
 
 @views.route('/process_youtube_url', methods=['POST'])
-
 @login_required
 def process_youtube_url():
-    response_data = {'messages': [], 'transcript_summary': '', 'summaries_left': None}
+    response_data = {
+        'messages': [],
+        'transcript_summary': '',
+        'summaries_left': None,
+        'audio_base64': None
+    }
 
     youtube_url = request.form.get('youtube_url')
-
-    #if is_valid_youtube_url(youtube_url):
-    #    response_data['messages'].append({'text': 'Invalid YouTube URL. Please enter a valid YouTube video URL.', 'category': 'error'})
-     #   return jsonify(response_data), 400  # Bad request status
-
     video_id = extract_video_id(youtube_url)
-
     transcript = fetch_transcript(video_id)
 
     if not transcript:
         response_data['messages'].append({'text': 'Error fetching transcript.', 'category': 'error'})
         return jsonify(response_data), 400
 
-    # Assuming this is a function you've defined to check the video length.
-    if is_video_too_long(transcript):  
-        response_data['messages'].append({'text': 'Sorry, videos longer than 30 minutes cannot be summarized for free users.', 'category': 'error'})
+    if is_video_too_long(transcript):
+        response_data['messages'].append({'text': 'Videos longer than 30 minutes cannot be summarized for free users.', 'category': 'error'})
         return jsonify(response_data), 400
 
-    # Assuming you have a method to check if the user has reached their summary limit.
-    if has_reached_summary_limit():  
+    if has_reached_summary_limit():
         response_data['messages'].append({'text': 'You have reached your monthly limit of summaries.', 'category': 'error'})
         return jsonify(response_data), 400
 
     summarized = summarize_transcript(transcript)
+
     if summarized:
         response_data['transcript_summary'] = summarized
+        audio_base64 = generate_audio(summarized)
 
-        # Increment the user's summary count after a successful summary operation
-        current_user.video_summary_count += 1
-        db.session.commit()
-
-        # Retrieve the updated summary count
-        response_data['summaries_left'] = current_user.video_summary_count
-    else:
-        response_data['messages'].append({'text': 'Error summarizing the video.', 'category': 'error'})
-        return jsonify(response_data), 500  # Internal server error status
+        if audio_base64:
+            response_data['audio_base64'] = audio_base64
+            current_user.video_summary_count += 1
+            db.session.commit()
+            response_data['summaries_left'] = current_user.video_summary_count
 
     return jsonify(response_data)
 

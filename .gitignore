@@ -55,6 +55,10 @@ cover/
 *.mo
 *.pot
 
+# AWS CLI credentials and config file
+.aws/
+
+
 # Django stuff:
 config.py
 .config

@@ -5,7 +5,10 @@ body {
     padding: 1rem;
     text-align: center;
 }
-
+/* CSS for highlighting spoken text */
+.highlighted {
+    background-color: yellow; /* Change this to your desired highlight color */
+}
 .container {
     max-width: 36rem;
     margin: 0 auto;
